@@ -1,0 +1,85 @@
+[build]
+  base = "backend"
+  publish = "backend"
+  command = "npm install"
+  functions = "backend/functions"
+
+[build.environment]
+  NODE_VERSION = "18"
+  NPM_VERSION = "9"
+
+# Redirect API requests to the serverless functions
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+# Define function bundles to optimize cold starts
+[functions]
+  directory = "functions"
+  node_bundler = "esbuild"
+
+# Define function with specific settings
+[functions.api]
+  included_files = ["backend/models/**", "backend/config/**"]
+
+# Handle SPA routing for potential admin interfaces
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  conditions = {Role = ["admin"]}
+
+# Rate limiting for API endpoints
+[[plugins]]
+  package = "@netlify/plugin-functions-core"
+
+[[plugins]]
+  package = "netlify-plugin-inline-functions-env"
+
+# Environment variable validation
+[[plugins]]
+  package = "netlify-plugin-checkenv"
+  
+  [plugins.inputs]
+  variables = ["MONGODB_URI", "JWT_SECRET"]
+
+# Setup headers for security
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "no-referrer-when-downgrade"
+    Content-Security-Policy = "default-src 'self'"
+
+# Prepare for serverless function deployment
+[functions.prep]
+  schedule = "@netlify/plugin-functions-install-core"
+
+# Set up dev environment
+[dev]
+  framework = "#custom"
+  command = "npm run dev"
+  port = 5000
+  targetPort = 5000
+  autoLaunch = true
+  
+# Configure environment variables for different contexts
+[context.production.environment]
+  NODE_ENV = "production"
+  
+[context.deploy-preview.environment]
+  NODE_ENV = "development"
+  
+[context.branch-deploy.environment]
+  NODE_ENV = "development"
+
+# Handle CORS for API endpoints
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
+    Access-Control-Allow-Headers = "Origin, X-Requested-With, Content-Type, Accept, Authorization"
